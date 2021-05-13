@@ -1,7 +1,3 @@
-[TOC]
-
-
-
 # 第三章 教程
 
 *3.1 服务器的连接与断开*
@@ -17,8 +13,6 @@
 *3.6 常用查询示例*
 
 *3.7 结合Apache使用MySQL*
-
-
 
 本章通过展示如何使用mysql客户端程序来创建并使用一个简单的数据库，提供了一个教程简介。
 
@@ -1781,6 +1775,7 @@ SELECT year,month,BIT_COUNT(BIT_OR(1<<day)) AS days FROM t1
 上述查询计算了对于每个年/月组合，表中有多少个不同的天，并自动删除重复的条目。
 ### 3.6.9 使用AUTO_INCREMENT
 `AUTO_INCREMENT`属性可以用来为一条新记录生成一个唯一的标识符：
+
 ```sql
 CREATE TABLE animals (
      id MEDIUMINT NOT NULL AUTO_INCREMENT,
@@ -1816,4 +1811,257 @@ INSERT INTO animals (id,name) VALUES(0,'groundhog');
 ```sql
 INSERT INTO animals (id,name) VALUES(NULL,'squirrel');
 ```
+当你向一个AUTO_INCREMENT列插入一个值时，则该列将被设置为该值，并且序号也将被重置，以便下一个自动生成的值依次位于最大列值之后。比如：
+```sql
+INSERT INTO animals (id,name) VALUES(100,'rabbit');
+INSERT INTO animals (id,name) VALUES(NULL,'mouse');
+SELECT * FROM animals;
++-----+-----------+
+| id  | name      |
++-----+-----------+
+|   1 | dog       |
+|   2 | cat       |
+|   3 | penguin   |
+|   4 | lax       |
+|   5 | whale     |
+|   6 | ostrich   |
+|   7 | groundhog |
+|   8 | squirrel  |
+| 100 | rabbit    |
+| 101 | mouse     |
++-----+-----------+
+```
+更新一个存在的`AUTO_INCREMENT`列的值也会重置`AUTO_INCREMENT`序列。
 
+你可以使用`LAST_INSERT_ID()`SQL函数或者`mysql_insert_id()`C API函数检索最新自动生成的`AUTO_INCREMENT`值。这两个函数是面向连接的，所以其他进行插入操作的连接不会影响他们的返回值。
+
+为`AUTO_INCREMENT`列选择数据类型时，选择能容纳你所需要的最大序号的最小的整形数据类型。当该列到达数据类型的最大值时，下一次生成序号的尝试将会失败。如果可能，使用`UNSIGNED`属性，以便允许更大的取值范围。比如，如果使用`TINYINT`，则最大允许序号为127。对于`TINYINT UNSIGNED`，最大序号为255。所有整型类型的取值范围，见11.1.2节 整型数据类型（精确值）-INTEGER,INT,SMALLINT,TINYINT,MEDIUMINT,BIGINT。
+
+> Note
+> 
+>对于多行插入，`LAST_INSERT_ID()`和`mysql_insert_id()`其实返回的是所插入行中的第一个`AUTO_INCREMENT`值。这使得多行插入在复制环境中的其他服务器上可以正确再现。（使得多行插入在复制环境中的从服务器上可以正确再现。）
+
+想要`AUTO_INCREMENT`的值以非1开始，可以用`CREATE TABLE`或`ALTER TABLE`语句设置该值：
+```sql
+mysql> ALTER TABLE tbl AUTO_INCREMENT = 100;
+```
+**InnoDB Notes**
+
+关于InnoDB存储引擎下`AUTO_INCREMENT`特定用法的信息，见15.6.1.6节 `AUTO_INCREMENT`在InnoDB中的处理方式。
+
+**MyISAM Notes**
+
+对于MyISAM表，你可以在多列索引的第二列上指定`AUTO_INCREMENT`。此时，`AUTO_INCREMENT`列生成的值为`MAX(auto_increment_column)+1 WHERE prefix=given-prefix`。当你向将数据放入有序组时，这很有用。
+
+```sql
+CREATE TABLE animals (
+    grp ENUM('fish','mammal','bird') NOT NULL,
+    id MEDIUMINT NOT NULL AUTO_INCREMENT,
+    name CHAR(30) NOT NULL,
+    PRIMARY KEY (grp,id)
+) ENGINE=MyISAM;
+
+INSERT INTO animals (grp,name) VALUES
+    ('mammal','dog'),('mammal','cat'),
+    ('bird','penguin'),('fish','lax'),('mammal','whale'),
+    ('bird','ostrich');
+
+SELECT * FROM animals ORDER BY grp,id;
+```
+输出结果：
+```sql
++--------+----+---------+
+| grp    | id | name    |
++--------+----+---------+
+| fish   |  1 | lax     |
+| mammal |  1 | dog     |
+| mammal |  2 | cat     |
+| mammal |  3 | whale   |
+| bird   |  1 | penguin |
+| bird   |  2 | ostrich |
++--------+----+---------+
+```
+
+在这种情况下（AUTO_INCREMENT 列是多列索引的一部分）， 如果删除了任意组中具有最大AUTO_INCREMENT值的行，则该AUTO_INCREMENT值将被重用。即使对于通常不会重用AUTO_INCREMENT值的MyISAM表，也会发生这种情况。
+
+如果AUTO_INCREMENT列是多个索引的一部分，则MySQL使用从该AUTO_INCREMENT列开始的索引（如果有的话）生成序列值 。例如，如果animals表包含索引PRIMARY KEY (grp, id) 和INDEX (id)，则MySQL将忽略 PRIMARY KEY用于生成序列值的。结果，该表将包含一个序列，而不是每个grp值一个序列。
+
+**延伸阅读**
+
+有关`AUTO_INCREMENT`的更多信息，见：
+* 如何将`AUTO_INCREMENT`属性分配给列，见13.1.20节 `CREATE TABLE`语句和13.1.9节 `ALTER TABLE`语句。
+* `AUTO_INCREMENT`的行为取决于`ON_AUTO_VALUE_ON_ZERO`SQL模式，见5.1.11节 服务器的SQL模式。
+* 如何使用`LAST_INSERT_ID()`函数找到包含最近`AUTO_INCREMENT`值的列，见12.16节 信息函数。
+* 设置`AUTO_INCREMENT`的值为要使用的值，见5.1.8节 服务器系统变量。
+* 15.6.1.6节 `AUTO_INCREMENT`在InnoDB中的处理方式。
+* `AUTO_INCREMENT`和复制，见17.5.1.1节 复制和`AUTO_INCREMENT`。
+* 可以用于复制的与`AUTO-INCREMENT`相关的系统变量（`auto_increment_increment`和`auto_increment_offset`），见5.1.8节 服务器系统变量。
+
+## 3.7 将MySQL与Apache结合使用
+有一些程序可以让你验证MySQL数据库中的用户，还可以让你将日志文件写入MySQL表。
+
+你可以通过将下面的字符加入到Apache配置文件中，以改变Apache日志文件格式，使其对于MySQL来说更加易读：
+```
+LogFormat \
+        "\"%h\",%{%Y%m%d%H%M%S}t,%>s,\"%b\",\"%{Content-Type}o\",  \
+        \"%U\",\"%{Referer}i\",\"%{User-Agent}i\""
+```
+要将一个上述格式的日志文件加载到MySQL，你可以使用下面的语句：
+```sql
+LOAD DATA INFILE '/local/access_log' INTO TABLE tbl_name
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' ESCAPED BY '\\'
+```
+要创建上述指定的表，使其具有与`LogFormat`行写入到日志文件中的列相对应的列。
+
+# 第四章 MySQL程序
+*4.1 MySQL程序概述*
+
+*4.2 使用MySQL程序*
+
+*4.3 服务器和服务器启动程序*
+
+*4.4 与安装相关的程序*
+
+*4.5 客户端程序*
+
+*4.6 管理和实用工具程序*
+
+*4.7 程序开发实用工具*
+
+*4.8 其他程序*
+
+*4.9 环境变量*
+
+*4.10 MySQL中Unix信号的处理*
+
+本章对Oracle公司提供的MySQL命令行程序进行了简短的概述。也对这些程序运行时指定选项的基本句法进行了讨论。大部分程序都有特定于其自身操作的选项，但选项句法是相似的。最后，本章提供了关于各个程序更详细的描述，包括他们可识别的选项。
+## 4.1 MySQL程序概述
+
+MySQL安装中有很多不同的程序。本节提供这些程序的简短概述。后面的章节会提供每个程序更详细的描述，除了NDB集群程序。每个程序的描述都说明了其调用句法和它所支持的选项。23.4节 NDB集群程序 描述了NDB集群特定的程序。
+
+除了那些特定于平台的程序外，大部分MySQL发行版本都包括了所有的这些程序。（比如，服务器启动脚本不适用于Windows。）一个例外是RPM发行版，它更加专用。服务器有一个RPM程序，客户端程序也有一个，以此类推。如果你发现缺失了一个或多个程序，见第二章 安装和更新MySQL，获得关于发行版的类型，以及他们包含哪些程序的信息。可能的原因是该发行版并不包含所有的程序，需要安装其他软件包。
+
+每个MySQL程序都有很多不同的选项。大部分程序提供一个`--help`选项，你可以通过它来获取程序不同选项的描述。比如，尝试`mysql --help`。
+
+你可以通过在命令行或选项文件中为MySQL程序指定选项，来覆盖其默认选项。有关调用程序和指定程序选项的信息，见4.2节 使用MySQL程序。
+
+MySQL服务器，mysqld程序，是主要的程序，它做了MySQL安装的大部分工作。服务器附有几个相关的脚本，可以帮助你启动或停止服务器：
+* msqld  
+SQL守护程序（即MySQL服务器）。想要使用客户端程序，mysqld必须运行，因为客户端通过连接到服务器来访问数据库。见4.3.1节 mysqld—MySQL服务器。
+* mysqld_safe  
+服务器启动脚本。mysqld_safe会尝试启动mysqld。见4.3.2节 mysqld_safe—MySQL服务器启动脚本。
+* mysql.server  
+服务器启动脚本。这个脚本用来在System V风格的系统上运行包含脚本的目录，为特定的运行级别开启系统服务。它通过调用mysqld_safe启动MySQL服务器。见4.3.3节 mysql.server—MySQL服务器启动脚本。
+* mysqld_multi  
+服务器启动脚本，可以启动或停止安装在系统上的多个服务器。见4.3.4节 mysqld_multi—管理多个MySQL服务器。
+
+有几个程序在MySQL安装和更新期间，执行设置操作：
+* comp_err  
+该程序在MySQL构建/安装期间使用。它从错误源码文件中编译错误消息文件。见4.4.1节 comp_err—编译MySQL错误消息文件。
+* mysql_secure_installation  
+该程序可以让你的MySQL安装提高安全性。见4.4.2节 mysql_secure_installation—提高MySQL安装安全性。
+* mysql_ssl_rsa_setup  
+该程序创建支持安全连接所需要的SSL安全证书、密钥文件、RSA密钥对文件，如果这些文件缺失了。mysql_ssl_rsa_setup创建的文件可以用于使用SSL或RSA的安全连接。见4.4.3节 mysql_ssl_rsa_setup—创建SSL/RSA文件。
+* mysql_tzinfo_to_sql  
+该程序使用主机系统zoneinfo数据库（描述时区文件的集合）中的内容加载`mysql`数据库中的时区表。见4.4.4节 mysql_tzinfo_to_sql—加载时区表。
+* mysql_upgrate  
+在MySQL8.0.16之前，该程序用在MySQL升级操作之后。根据新版本的MySQL的变化，来升级权限表，检查表的不兼容性，并在必要时修复它。见4.4.5节 mysql_upgrade—检查和升级MySQL表。  
+从MySQL8.0.16开始，MySQL服务器由mysql_upgrade执行的升级任务提前了。（详细信息见2.11.3节 MySQL升级过程都升级了什么。）
+
+连接MySQL服务器的MySQL客户端程序：
+* mysql  
+用于交互式的输入SQL语句或以批处理模式从文件中执行SQL语句的命令行工具，见4.5.1节 mysql—MySQL命令行客户端。
+* mysqladmin  
+执行管理操作的客户端，比如创建或删除数据库，重载权限表，将表刷到磁盘，以及重新打开日志文件。`mysqladmin`还可以用来检索服务器的版本、进程和状态信息。见4.5.2节 mysqladmin—MySQL服务器管理程序。
+* mysqlcheck  
+表维护客户端，检查、修复、分析以及优化表。见4.5.3节 mysqlcheck—表维护程序。
+* mysqldump  
+将MySQL数据库以SQL、text或XML格式转储到文件中。见4.5.4节 mysqldump—数据库备份程序。
+* mysqlimport  
+一个用`LOAD DATA`语句将text文件导入到对应的表中的客户端程序。见4.5.5节 mysqlimport—数据导入程序。
+* mysqlpump  
+一个将MySQL数据库以SQL格式转储到文件中的客户端程序。见4.5.6节 mysqlpump—数据库备份程序。
+* mysqlsh  
+MySQL shell是MySQL服务器的高级客户端程序和代码编辑器。见[MySQL shell 8.0](https://dev.mysql.com/doc/mysql-shell/8.0/en/)。除了提供类似于mysql程序的SQL功能外，MySQL shell还提供JavaScript和python脚本功能，包括各种API。X DevAPI使你可以使用关系数据和文档数据，见第二十章 将MySQL用作文档存储。AdminAPI使你可以使用InnoDB集群，见[使用MySQL AdminAPI](https://dev.mysql.com/doc/mysql-shell/8.0/en/admin-api-userguide.html)。
+* mysqlshow  
+一个用来显示数据库、表、列以及索引信息的客户端程序。见4.5.7节 mysqlshow—显示数据库、表、以及列信息。
+* mysqlslap  
+一个为MySQL服务器设计的用来模拟客户端负载以及报告每个阶段的时间的客户端程序。就像多个客户端同时访问服务器一样。见4.5.8节 mysqlslap—负载模拟客户端程序。
+
+MySQL管理和实用工具程序：
+* innochecksum  
+脱机的InnoDB脱机文件校验和实用工具。见4.6.2节 innochecksum—脱机InnoDB文件校验和实用工具。
+* myisam_ftdump  
+用来显示MyISAM表全文索引信息的实用工具。见4.6.3节 myisam_ftdump—显示全文索引信息。
+* myisamchk  
+描述、检查、优化和修复MyISAM表的实用工具。见4.6.4节 myisamchk—MyISAM表维护工具。
+* myisamlog  
+用来审阅MyISAM日志文件内容的实用工具。见4.6.5节 myisamlog—显示MyISAM日志文件内容。
+* myisampack  
+用来压缩MyISAM表以生成更小的只读表的实用工具。见4.6.6节 myisampack—生成压缩的、只读的MyISAM表。
+* mysql_config_editor  
+一个实用工具，使你可以将身份验证凭据存储在名为.mylogin.cnf的安全、加密的登录路径文件中。见4.6.7节 mysql_config_editor—MySQL配置实用工具。
+* mysql_migrate_keyring  
+一个实用工具，用于在一个密钥环组件和另一个密钥环组件之间迁移密钥。见4.6.8节 mysql_migrate_keyring—密钥环密钥迁移实用工具。
+* mysqlbinlog  
+一个从二进制日志中读取SQL语句的实用工具。二进制日志文件中包含的执行过的SQL语句的记录，可以用于崩溃恢复。见4.6.9节 mysqlbinlog—处理二进制日志文件的实用工具。
+* mysqldumpshow  
+用于读取和汇总慢查询日志内容的实用工具。见4.6.10节 mysqldumpshow—汇总慢查询日志。
+
+MySQL程序开发实用工具：
+* mysql_config  
+一个shell脚本，该脚本可以生成编译MySQL程序时需要的选项值。见4.7.1节 mysql_config—显示编译客户端程序的选项。
+* my_print_defaults  
+一个实用工具，用于显示选项文件的选项组中存在哪些选项。见4.7.2节 my_print_defaults—从选项文件中显示选项。
+
+其他实用工具：
+* lz4_decompress  
+一个实用工具，用来解压缩mysqlpump程序通过LZ4压缩产生的输出。见4.8.1节 lz4_decompress—解压缩mysqlpump LZ4-Compressed输出。
+* perror  
+一个实用工具，用来显示系统或MySQL错误代码的含义。见4.8.2节 perror—显示MySQL错误消息信息。
+* zlib_decompress  
+一个实用工具，用来解压缩mysqlpump程序通过ZLIB压缩产生的输出。见4.8.3节 zlib_decompress—解压缩mysqlpump ZLIB-Compressed输出。
+
+Oracle公司还提供了MySQL Wordbench图形界面工具，用来管理MySQL服务器或数据库，可以创建、执行、评估查询，也可以将其他关系数据库管理系统的模式和数据迁移到MySQL服务器上。
+
+MySQL客户端程序与服务器通过使用MySQL客户端/服务器库来进行通信，会用到以下环境变量。
+
+| Environment Variable | Meaning                                  |
+| -------------------- | ---------------------------------------- |
+| MYSQL_UNIX_PORT      | 默认Unix套接字文件，用于连接到本地主机。 |
+| MYSQL_TCP_PORT       | 默认端口号，用于TCP/IP连接。             |
+| MYSQL_DEBUG          | 调试时的调试跟踪选项。                   |
+| TMPDIR               | 临时表和临时文件创建的目录。             |
+
+MySQL程序所使用的环境变量的完整列表，见4.9节 环境变量。
+
+## 4.2 使用MySQL程序
+
+*4.2.1 调用MySQL程序*
+
+*4.2.2 指定程序选项*
+
+*4.2.3 用于连接服务器的命令选项*
+
+*4.2.4 使用命令选项连接到MySQL服务器*
+
+*4.2.5 使用URI-Like字符串或键值对连接到服务器*
+
+*4.2.6 使用DNS SRV记录连接到服务器*
+
+*4.2.7 连接传输协议*
+
+*4.2.8 连接压缩控制*
+
+*4.2.9 设置环境变量*
+
+### 4.2.1 调用MySQL程序
+
+为从命令行（就是shell或者命令提示符）调用MySQL程序，请输入程序名，然后输入任意选项或需要的其他参数，来指示该程序你想让它做什么。下面的命令展示了几个程序调用的例子。
+```shell
+shell> mysql --user=root test
+shell> mysqladmin extended-status variables
+shell> mysqlshow --help
+shell> mysqldump -u root personnel
+```
+以破折号（-或--）开头的参数指定程序的选项。选项一般指示程序应与服务器建立连接的类型

@@ -4,8 +4,8 @@
 
 
 
-[GitHub]()
-[Get Started](http://localhost:3000/#/?id=mysql)
+[GitHub](https://github.com/zidane-wcp/mysql)
+[Get Started](https://zidane-wcp.github.io/mysql)
 
 
 
