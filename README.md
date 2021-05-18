@@ -14,7 +14,7 @@
 
 *3.7 结合Apache使用MySQL*
 
-本章通过展示如何使用mysql客户端程序来创建并使用一个简单的数据库，提供了一个教程简介。
+本章通过展示如何使用mysql客户端来创建并使用一个简单的数据库，提供了一个教程简介。
 
 mysql（有时被称为终端监视器或监视器）是一个交互式程序，可以让你连接到MySQL服务器、运行查询以及浏览查询结果。mysql还可以用在批处理模式下：事先将你的查询语句存放在一个文件中，告诉mysql来执行这个文件中的内容。这里介绍了mysql的这两种用法。
 
@@ -2158,7 +2158,7 @@ shell>
 
 要在语句中使用带引号的值，必须在语句中转义内部的引号，或者在语句内使用与引号本身不同的引号。命令处理器的功能决定了你可以选择使用单引号还是双引号以及转义引号字符的语法。例如，如果命令处理器支持使用单引号或双引号引起来的引用，则可以在语句前后使用双引号，并对语句内的所有带引号的值使用单引号。
 
-#### 4.2.2.2 使用选项文件（未完，待续）
+#### 4.2.2.2 使用选项文件（to be continued）
 
 大部分MySQL程序都可以从选项文件中（有时被称为配置文件）读取启动选项。选项文件提供了一种指定常用选项的简单方式，每次运行一个程序是不需要在命令行中输入选项。
 
@@ -2170,5 +2170,268 @@ shell>
 >禁用了`persisted_global_load`系统变量的服务器，不会读取`mysqld-auto.cnf`。
 
 很多选项文件是纯文本文件，可以用任意文本编辑器创建。例外是：
-* `.myligin.cnf`文件包含登录路径选项。该文件是一个由`mysql_config_editor`实用程序创建的加密文件。见4.6.7节 mysql_config_editor—mysql配置实用程序。登录路径就是只允许包含`host,user,password,port,socket`选项的选项组。客户端程序使用`--login-path`选项指定从`.mylogin.cnf`文件中读取哪个登录路径。
+* `.myligin.cnf`文件包含登录路径选项。该文件是一个由`mysql_config_editor`实用程序创建的加密文件。见4.6.7节 mysql_config_editor—mysql配置实用程序。登录路径就是只允许包含`host,user,password,port,socket`选项的选项组。客户端程序使用`--login-path`选项指定从`.mylogin.cnf`文件中读取登录路径。
 设置`MYSQL_TEST_LOGIN_FILE`系统变量，以指定一个备用登录路径文件名。该变量会被`mysql-test-run.pl`测试实用程序使用，也可以被`mysql_config_editor`实用程序识别，以及MySQL客户端程序比如`mysql,mysqladmin`等。
+
+#### 4.2.2.3 影响选项文件处理的命令行选项 （to be continued）
+
+#### 4.2.2.4 程序选项修饰符 （to be continued）
+
+#### 4.2.2.5 用选项设置程序变量（to be continued）
+
+#### 4.2.2.6 选项默认值，选项额外值和等号（to be continued）
+
+### 4.2.3 用于连接服务器的命令选项（to be continued）
+
+### 4.2.4 使用命令选项连接到MySQL服务器（to be continued）
+
+### 4.2.5 使用URI-Like字符串或键值对连接到服务器（to be continued）
+
+### 4.2.6 使用DNS SRV记录连接到服务器（to be continued）
+
+### 4.2.7 连接传输协议（to be continued）
+
+### 4.2.8 连接压缩控制（to be continued）
+
+### 4.2.9 设置环境变量（to be continued）
+
+## 4.3 服务器和服务器启动程序
+
+*4.3.1 mysqld——mysql服务器*
+
+*4.3.2 mysql_safe——MySQL服务器启动脚本*
+
+*4.3.3 mysql.server——mysql服务器启动脚本*
+
+*4.3.4 mysqld_multi——管理多个MySQL服务器*
+
+本节描述mysqld，即MySQL服务器，以及用于启动服务器的几个程序。
+
+### 4.3.1 mysqld——MySQL服务器
+
+mysqld，也被称为MySQL服务器，是一个单线程程序，可以完成一个MySQL安装中大部分工作。他不会产生其他进程。MySQL服务器负责管理包含数据库和表的MySQL数据目录的访问。数据目录也是诸如日志文件和状态文件等其他信息的默认位置。
+
+>Note
+>
+>有些安装包包含名为mysqld-debug的服务器的debug版本。调用次版本而不是mysqld版本，可获得debug支持，内存分配检查以及追踪文件支持（见5.9.1.2节 创建追踪文件）。
+
+当MySQL服务器启动后，他会监听来自客户端程序的网络连接，并代表这些客户端管理对数据库的访问。
+
+mysqld程序在启动时有很多选项可以被指定。以下命令可提供这些选项的完整列表：
+```shell
+mysqld --verbose --help
+```
+MySQL服务器也有一组系统变量，这些变量会影响服务器运行时的行为。系统变量何以在服务器启动时进行设置，他们中的很多也可以在运行时更改，以实现动态服务器重新配置。MySQL服务器还有一组状态变量，可以提供其运行时的信息。你可以检测这些状态变量，以获得运行时性能特征。
+
+MySQL服务器命令选项，系统变量以及状态变量的完整描述，见5.1节 MySQL服务器。关于安装MySQL服务器和设置初始配置的信息，见第二章 安装和更新MySQL。
+
+### 4.3.2 mysqld_safe——MySQL服务器启动脚本（to be continued）
+
+### 4.3.3 mysql.server——MySQL服务器启动脚本（to be continued）
+
+### 4.3.4 mysqld_multi——管理多个MySQL服务器（to be continued）
+
+## 4.4 与安装有关的程序
+
+## 4.5 客户端程序
+
+*4.5.1 mysql——MySQL命令行客户端*
+
+*4.5.2 mysqladmin——MySQL服务器管理程序*
+
+*4.5.3 mysqlcheck——表维护程序*
+
+*4.5.4 mysqldump——数据库备份程序*
+
+*4.5.5 mysqlimport——数据导入程序*
+
+*4.5.6 mysqlpump——数据库备份程序*
+
+*4.5.7 mysqlshow——显示数据库、表和列信息*
+
+*4.5.8 mysqlslap——负载模拟程序*
+
+本节描述连接到MySQL服务器上的客户端程序。
+
+### 4.5.1 mysql——MySQL命令行客户端
+
+*4.5.1.1 mysql客户端选项*
+
+*4.5.1.2 mysql客户端命令*
+
+*4.5.1.3 mysql客户端记录*
+
+*4.5.1.4 mysql客户端服务器端帮助*
+
+*4.5.1.5 从Text文件执行SQL语句*
+
+*4.5.1.6 mysql客户端Tips*
+
+mysql是一个具有输入行编辑功能的简单SQL shell。它支持交互式和非交互式用法。交互式下，查询结果以ASCII-table格式显示，非交互式下（比如，用作过滤器），查询结果以制表符分割的格式显示。输出格式可以通过命令选项进行改变。
+
+如果由于内存不足而无法存储很大的结果集而出现问题，使用`--quick`选项。这强制使mysql每次从服务器检索一行数据，而不是检索所有数据并在显示之前存入内存缓冲区。这是通过使用客户端/服务器中的C API函数`mysql-use-result()`实现的，而不是`mysql_store_result()`。
+
+>Note
+>
+>另外，MySQL Shell提供对X DevAPI的访问。详细信息见MySQL shell8.0。
+
+使用mysql很简单，在命令解释器提示符中调用即可，如下：
+```shell
+mysql db_name
+```
+或者：
+```shell
+mysql --user=user_name --password db_name
+```
+此时，你需要在提示符中输入密码来回应mysql的显示：
+```shell
+Enter password: your_password
+```
+然后出入一条SQL语句，以`;,\g,\G`结尾，然后按回车。
+
+按下`Control+C`以中断当前语句（如果存在），或取消任意为完成的输入行。
+
+你可以从一个脚本文件（批处理文件）中执行SQL语句，如下：
+```shell
+mysql db_name < script.sql > output.tab
+```
+Unix系统上，mysql会将交互执行的SQL语句记录到一个历史文件中。见4.5.1.3节 mysql客户端日志。
+
+#### 4.5.1.1 mysql客户端选项（to be continued）
+
+#### 4.5.1.2 mysql客户端命令（to be continued）
+
+#### 4.5.1.3 mysql客户端记录（to be continued）
+
+#### 4.5.1.4 mysql客户端服务器端帮助（to be continued）
+
+#### 4.5.1.5 从Text文件中执行SQL语句（to be continued）
+
+有时，你想让脚本展示过程信息，可用以下语句：？？？
+```sql
+SELECT '<info_to_display>' AS ' ';
+```
+
+#### 4.5.1.6 mysql客户端Tips（to be continued）
+
+### 4.5.2 mysqladmin——MySQL服务器管理程序（to be continued）
+
+### 4.5.3 mysqlcheck——表维护程序（to be continued）
+
+### 4.5.4 mysqldump——数据库备份程序（to be continued）
+
+### 4.5.5 mysqlinport——数据导入程序（to be continued）
+
+### 4.5.6 mysqlpump——数据库备份程序（to be continued）
+
+### 4.5.7 mysqlshow——显示数据库、表和列信息（to be continued）
+
+### 4.5.8 mysqlslap——负载模拟客户端（to be continued）
+
+mysqlslap是一个诊断程序，旨在模拟MySQL服务器的客户端负载，并报告每个阶段的时间。它模拟多个客户端访问服务器。
+
+像这样调用mysqlslap：
+```sql
+mysqlslap [options]
+```
+有些选项比如`--create,--query`，是你能够指定包含一条语句的字符串或包含多条语句的文件。如果你制定了一个文件，默认每行必须包含一条语句。（也就是说，隐式语句定界符是换行符。）使用`--delimiter`选项制定一个不同的定界符，这使你可以指定跨越多行的语句，或将多条语句放在一行内。你不能在文件中包含评论，mysqlslap不能识别他们。
+
+mysqlslap运行分为三个阶段：
+1. 创建模式，表以及任何可选的存储程序或数据以供测试使用。这个阶段使用一个客户端连接。
+2. 运行负载特使。这个阶段可以使用多个客户端连接。
+3. 清除阶段（断开连接，删除表指定的表）。这个阶段使用一个客户端连接。
+
+比如：
+提供你自己的创建和查询SQL语句，用50个客户端进行查询，每个客户端200次select操作（将命令在一行中输入）：
+
+```shell
+mysqlslap --delimiter=";"
+  --create="CREATE TABLE a (b int);INSERT INTO a VALUES (23)"
+  --query="SELECT * FROM a" --concurrency=50 --iterations=200
+```
+
+让mysqlslap用包含两个INT列和三个VARCHAR列的表构建查询SQL语句。使用5个客户端每个20次查询。不要创建表或者插入数据（也就是说，使用之前测试例子中的模式和表）：
+```shell
+mysqlslap --concurrency=5 --iterations=20
+  --number-int-cols=2 --number-char-cols=3
+  --auto-generate-sql
+```
+告诉程序从指定的文件中加载创建、插入和查询SQL语句，create.sql文件有多条以分号为定界符的表创建语句，和多条以分号为定界符的插入语句。`--query`选项指定的文件应该包含多条以分号为定界符的查询语句。运行加载语句，然后运行查询语句文件中的所有查询使用5个客户端（每个查询5次）：
+```shell
+mysqlslap --concurrency=5
+  --iterations=5 --query=query.sql --create=create.sql
+  --delimiter=";"
+```
+mysqlslap支持以下选项，可以在命令行中指定，也可以在选项文件中的[mysqlslap]或[client]选项组中指定。
+
+| Option Name                             | Description                                                  | Introduced | Deprecated |
+| :-------------------------------------- | ------------------------------------------------------------ | ---------- | ---------- |
+| --auto-generate-sql                     | Generate SQL statements automatically when they are not supplied in files or using command options |            |            |
+| --auto-generate-sql-add-autoincrement   | Add AUTO_INCREMENT column to automatically generated tables  |            |            |
+| --auto-generate-sql-execute-number      | Specify how many queries to generate automatically           |            |            |
+| --auto-generate-sql-guid-primary        | Add a GUID-based primary key to automatically generated tables |            |            |
+| --auto-generate-sql-load-type           | Specify the test load type                                   |            |            |
+| --auto-generate-sql-secondary-indexes   | Specify how many secondary indexes to add to automatically generated tables |            |            |
+| --auto-generate-sql-unique-query-number | How many different queries to generate for automatic tests   |            |            |
+| --auto-generate-sql-unique-write-number | How many different queries to generate for --auto-generate-sql-write-number |            |            |
+| --auto-generate-sql-write-number        | How many row inserts to perform on each thread               |            |            |
+| --commit                                | How many statements to execute before committing             |            |            |
+| --compress                              | Compress all information sent between client and server      |            | 8.0.18     |
+| --compression-algorithms                | Permitted compression algorithms for connections to server   | 8.0.18     |            |
+| --concurrency                           | Number of clients to simulate when issuing the SELECT statement |            |            |
+| --create                                | File or string containing the statement to use for creating the table |            |            |
+| --create-schema                         | Schema in which to run the tests                             |            |            |
+| --csv                                   | Generate output in comma-separated values format             |            |            |
+| --debug                                 | Write debugging log                                          |            |            |
+| --debug-check                           | Print debugging information when program exits               |            |            |
+| --debug-info                            | Print debugging information, memory, and CPU statistics when program exits |            |            |
+| --default-auth                          | Authentication plugin to use                                 |            |            |
+| --defaults-extra-file                   | Read named option file in addition to usual option files     |            |            |
+| --defaults-file                         | Read only named option file                                  |            |            |
+| --defaults-group-suffix                 | Option group suffix value                                    |            |            |
+| --delimiter                             | Delimiter to use in SQL statements                           |            |            |
+| --detach                                | Detach (close and reopen) each connection after each N statements |            |            |
+| --enable-cleartext-plugin               | Enable cleartext authentication plugin                       |            |            |
+| --engine                                | Storage engine to use for creating the table                 |            |            |
+| --get-server-public-key                 | Request RSA public key from server                           |            |            |
+| --help                                  | Display help message and exit                                |            |            |
+| --host                                  | Host on which MySQL server is located                        |            |            |
+| --iterations                            | Number of times to run the tests                             |            |            |
+| --login-path                            | Read login path options from .mylogin.cnf                    |            |            |
+| --no-defaults                           | Read no option files                                         |            |            |
+| --no-drop                               | Do not drop any schema created during the test run           |            |            |
+| --number-char-cols                      | Number of VARCHAR columns to use if --auto-generate-sql is specified |            |            |
+| --number-int-cols                       | Number of INT columns to use if --auto-generate-sql is specified |            |            |
+| --number-of-queries                     | Limit each client to approximately this number of queries    |            |            |
+| --only-print                            | Do not connect to databases. mysqlslap only prints what it would have done |            |            |
+| --password                              | Password to use when connecting to server                    |            |            |
+| --pipe                                  | Connect to server using named pipe (Windows only)            |            |            |
+| --plugin-dir                            | Directory where plugins are installed                        |            |            |
+| --port                                  | TCP/IP port number for connection                            |            |            |
+| --post-query                            | File or string containing the statement to execute after the tests have completed |            |            |
+| --post-system                           | String to execute using system() after the tests have completed |            |            |
+| --pre-query                             | File or string containing the statement to execute before running the tests |            |            |
+| --pre-system                            | String to execute using system() before running the tests    |            |            |
+| --print-defaults                        | Print default options                                        |            |            |
+| --protocol                              | Transport protocol to use                                    |            |            |
+| --query                                 | File or string containing the SELECT statement to use for retrieving data |            |            |
+| --server-public-key-path                | Path name to file containing RSA public key                  |            |            |
+| --shared-memory-base-name               | Shared-memory name for shared-memory connections (Windows only) |            |            |
+| --silent                                | Silent mode                                                  |            |            |
+| --socket                                | Unix socket file or Windows named pipe to use                |            |            |
+| --sql-mode                              | Set SQL mode for client session                              |            |            |
+| --ssl-ca                                | File that contains list of trusted SSL Certificate Authorities |            |            |
+| --ssl-capath                            | Directory that contains trusted SSL Certificate Authority certificate files |            |            |
+| --ssl-cert                              | File that contains X.509 certificate                         |            |            |
+| --ssl-cipher                            | Permissible ciphers for connection encryption                |            |            |
+| --ssl-crl                               | File that contains certificate revocation lists              |            |            |
+| --ssl-crlpath                           | Directory that contains certificate revocation-list files    |            |            |
+| --ssl-fips-mode                         | Whether to enable FIPS mode on client side                   |            |            |
+| --ssl-key                               | File that contains X.509 key                                 |            |            |
+| --ssl-mode                              | Desired security state of connection to server               |            |            |
+| --tls-ciphersuites                      | Permissible TLSv1.3 ciphersuites for encrypted connections   | 8.0.16     |            |
+| --tls-version                           | Permissible TLS protocols for encrypted connections          |            |            |
+| --user                                  | MySQL user name to use when connecting to server             |            |            |
+| --verbose                               | Verbose mode                                                 |            |            |
+| --version                               | Display version information and exit                         |            |            |
+| --zstd-compression-level                | Compression level for connections to server that use zstd compression | 8.0.18     |            |
