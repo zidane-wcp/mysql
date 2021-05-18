@@ -2231,7 +2231,7 @@ MySQL服务器命令选项，系统变量以及状态变量的完整描述，见
 
 ### 4.3.4 mysqld_multi——管理多个MySQL服务器（to be continued）
 
-## 4.4 与安装有关的程序
+## 4.4 与安装有关的程序（to be continued）
 
 ## 4.5 客户端程序
 
@@ -2435,3 +2435,13 @@ mysqlslap支持以下选项，可以在命令行中指定，也可以在选项�
 | --verbose                               | Verbose mode                                                 |            |            |
 | --version                               | Display version information and exit                         |            |            |
 | --zstd-compression-level                | Compression level for connections to server that use zstd compression | 8.0.18     |            |
+
+## 4.6 管理和实用程序（to be continued）
+
+## 4.7 程序开发实用程序（to be continued）
+
+## 4.8 其他程序（to be continued）
+
+## 4.9 环境变量（to be continued）
+
+## 4.10 MySQL中Unix信号的处理
