@@ -2657,4 +2657,4 @@ shell> mysqld --defaults-file=./my.cnf-test --validate-config
 'tx_read_only=ON'.
 2018-11-05T10:40:02.712178Z 0 [ERROR] [MY-010119] [Server] Aborting
 ```
-记住，如果`--defaults-file`选项被指定了，则在命令行中它必须是第一个选项。（以相反的选项顺序运行前面的例子，将会产生一条消息，`--defaults-file`本身是未知的。
+记住，如果`--defaults-file`选项被指定了，则在命令行中它必须是第一个选项。（以相反的选项顺序运行前面的例子，将会产生一条消息，`--defaults-file`本身是未知的。）
