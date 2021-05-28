@@ -3115,6 +3115,78 @@ log_error_verbosity=1     # error messages only
 ```
 该例子中，`log_error_verbosity`允许优先级为`ERROR`的消息，丢弃优先级为`WARNING, INFORMATION`的消息。此时设置`log_error_suppression_list`是不会有任何影响的，因为它要丢弃的所有错误代码已经被`log_error_verbosity`丢弃了。（`log_error_suppression_list`变量只会作用于优先级为`WARNING, INFORMATION`的消息。）
 
-#### 基于优先级的错误日志过滤（log_filter_internal）
+#### 5.4.2.6 基于规则的错误日志过滤（log_filter_dragnet）
 
-`log_filter_internal`日志过滤器组件实现了
+`log_filter_dragnet`日志过滤器组件可以启用基于用户自定义规则的日志过滤。
+
+要启用`log_filter_dragnet`过滤器，首先要加载该过滤器组件，然后修改`log_error_services`的值。下面的例子启用`log_filter_dragnet`与内建日志接收器相组合。
+```sql
+INSTALL COMPONENT 'file://component_log_filter_dragnet';
+SET GLOBAL log_error_services = 'log_filter_dragnet; log_sink_internal';
+```
+要设置`log_error_services`为在服务器启动时生效，请查看5.4.2.1节 错误日志配置 中的说明。该说明同样适用于其他的错误日志系统变量。
+
+启用`log_filter_dragnet`后，通过设置`dragnet.log_error_filter_rules`系统变量定义其过滤规则。一个规则集包含另个或更多的规则，每个过滤规则位于一个IF语句中，以点号（.）结尾。如果该变量值为空（零个规则），则不会进行过滤。
+
+**例子1.**该规则集丢弃优先级为`INFORMATION`的事件，对于其它事件，移除`source_line`字段。
+~~该过滤规则与`log_error_verbosity`为2的`log_sink_internal`过滤器效果相似。~~（有问题，sink应为filter）
+
+为了更好的可读性，你可能发现将规则列在不同行中更合适，比如：
+```sql
+SET GLOBAL dragnet.log_error_filter_rules = '
+  IF prio>=INFORMATION THEN drop.
+  IF EXISTS source_line THEN unset source_line.
+';
+```
+**例子2.**该规则限制优先级为`INFORMATION`的事件最多60秒出现一个：
+```sql
+SET GLOBAL dragnet.log_error_filter_rules =
+  'IF prio>=INFORMATION THEN throttle 1/60.';
+```
+在设置完所需的过滤配置后，考虑使用`SET PERSIST`而不是`SET GLOBAL`语句来分配`dragnet.log_error_filter_rules`，使设置在服务器重启后持续有效。或者将设置保存到选项文件中。
+
+若不再使用过滤措辞，先将其从错误日志组件集中移除。通常这意味着使用一个不同的过滤器组件，而不是不使用过滤器组件。比如：
+```sql
+SET GLOBAL log_error_services = 'log_filter_internal; log_sink_internal';
+```
+再次，考虑使用`SET PERSIST`而不是`SET GLOBAL`，使设置在服务器重启后持续生效。
+
+然后卸载`log_filter_dragnet`过滤器组件：
+```sql
+UNINSTALL COMPONENT 'file://component_log_filter_dragnet';
+```
+下面的章节更详细的描述了`log_filter_dragnet`过滤器的操作。
+
+*5.4.2.6.1 log-filter-dragnet规则语言语法*
+
+*5.4.2.6.2 log_filter_dragnet规则的行为*
+
+*5.4.2.6.3 log_filter_dragnet规则的字段参考*
+
+##### 5.4.2.6.1 log-filter-dragnet规则语言语法（to be continued）
+
+##### 5.4.2.6.2 log_filter_dragnet规则的行为（to be continued）
+
+##### 5.4.2.6.3 log_filter_dragnet规则的字段参考（to be continued）
+
+#### 5.4.2.7 以JSON格式记录错误
+
+本节介绍如何使用内建过滤器`log_filter_internal`和JSON接收器`log_sink_json`配置错误日志记录，以立即生效并随后服务器重启也会生效。有关配置错误日志的一般信息，见5.4.2.1节 错误日志配置。
+
+要启用JSON接收器，首先加载该接收器组件，然后修改`log_error_services`的值：
+```sql
+INSTALL COMPONENT 'file://component_log_sink_json';
+SET PERSIST log_error_services = 'log_filter_internal; log_sink_json';
+```
+要设置`log_error_services`为在服务器启动时生效，请查看5.4.2.1节 错误日志配置 中的说明。该说明同样适用于其他的错误日志系统变量。
+
+可以在`log_error_services`的值中多次指定`log_sink_json`。比如，一个实例要写入不过滤的事件，另一个实例要写入过滤的事件，你可以进行如下设置：
+```sql
+SET PERSIST log_error_services = 'log_sink_json; log_filter_internal; log_sink_json';
+```
+JSON接收器根据`log_error`系统变量指定的默认错误日志目的地，来决定他的输出目的地。如果`log_error`指定了一个文件，则JSON接收器将其输出文件名基于`log_error`指定的文件名，并加上一个`.NN.json`前缀，NN为数字，从00开始。比如，如果`log_error`的值为file_name，则在`log_error_services`中指定的`log_sink_json`的连续的实例将日志写入`file_name.00.json, file_name.01.json`等，以此类推。
+
+如果`log_error`的值为`stderr`，则JSON接收器将日志写入控制台。如果`log_sink_json`在`log_error_services`中被多次指定，他们都将写入控制台，这可能没啥用。
+
+#### 5.4.2.8 将错误记录到系统日志
+
