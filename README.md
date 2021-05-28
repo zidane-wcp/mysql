@@ -2658,3 +2658,463 @@ shell> mysqld --defaults-file=./my.cnf-test --validate-config
 2018-11-05T10:40:02.712178Z 0 [ERROR] [MY-010119] [Server] Aborting
 ```
 记住，如果`--defaults-file`选项被指定了，则在命令行中它必须是第一个选项。（以相反的选项顺序运行前面的例子，将会产生一条消息，`--defaults-file`本身是未知的。）
+
+### 5.1.4 服务器选项、系统变量和状态变量参考（to be continued）
+
+下面的表列出了`mysqld`可用的的所有的命令行选项、系统变量和状态变量。
+
+### 5.1.5 服务器系统变量参考（to be continued）
+
+### 5.1.6 服务器状态变量参考（to be continued）
+
+### 5.1.7 服务器命令选项（to be continued）
+
+### 5.1.19 服务器关机过程
+
+服务器关闭过程如下所示：
+
+1. 关机过程开始
+这可以通过几种方式启动。比如，一个拥有`shutdown`权限的用户执行了`mysqladmin shoudown`命令。`mysqladmin`命令由MySQL支持，可以在任意平台上使用。其他特定于操作系统的关机启动方式也是可行的：在Unix系统上，当服务器收到`SIGTREM`信号时，或在Windows系统上，当服务器管理员让其关机时。
+
+2. 若需要，服务器创建关机线程
+根据关机是如何启动的，服务器可能会创建一个线程来处理关机过程。如果关机是由客户端请求的，则会创建关机线程。如果关机是因为接收到了`SIGTERM`信号，信号线程可能会亲自处理关机，或者创建一个单独的线程来关机。如果服务器尝试创建一个关机线程，但是失败了（比如，内存满了），他会发出一条诊断信息，并写入错误日志。
+```
+Error:Can't create thread to kill server
+```
+3. 服务器停止接收新连接
+为了在关机期间阻止新活动的加入，服务器通过关闭正常监听连接的网络接口的处理程序：TCP/IP端口、Unix套接字文件、Windows命名管道、Windows的共享内存，来停止接受新客户端连接。
+
+4. 服务器终止当前活动
+对于每一个与一个客户端连接有关的线程，服务器断开与客户端的连接并将该线程标记为杀死。当他们意识到被标记时，线程就会终止。空闲连接的线程很快就会死掉。当前正在执行语句的线程会周期性的检查他们的状态，会花费更长的时间才会死掉。有关线程终止的更多信息，见13.7.8.4节 KILL语句，尤其是有关终止对MyISAM表`REPAIR TABLE`和`OPTIMIZE TABLE`的操作的命令。
+对于具有打开事务的线程，事务将被回滚。如果一个线程正在更新一个非事务表，多行更新和插入操作可能会让表处于部分更新状态，因为操作在完成之前被终止了。
+如果服务器是一个复制原服务器，将当前连接的从服务器的线程看做客户端线程。此时，每个线程都被标记为终止，并在下次检查其状态时退出。
+如果服务器是一个从服务器，如果处于活跃状态，它将会停止复制I/O和SQL线程，然后再将其标记为终止。SQL线程允许完成其当前语句（为了避免引发复制问题），然后再停止。如果SQL线程此时处于事务中间，服务器将会等待，直到当前复制事件组（如果有）完成执行，或者直到用户发出`KILL QUERY`或`KILL CONNECTION`语句。见13.4.2.10节 STOP SLAVE | REPLICA语句。因为非事务语句不会被回滚，为了保证崩溃安全的复制，应该只使用事务表。
+>Note
+>
+>为保证复制的崩溃安全性，在开始复制时，必须启动`--relay-log-recovery`。
+见17.2.4节 中级日志和复制元数据仓库。
+
+5. 服务器关闭或关闭存储引擎
+这个阶段，服务器刷新表缓存，并管理所有的表。
+每个存储引擎都会对其管理的表执行任何必要的操作。InnoDB将其缓冲池刷新到硬盘（除非`innodb_fast_shutdown`值为2），将当前LSN写入表空间，然后终止其自己的内部线程。MyISAM刷新表的任何挂起的索引写入。
+6. 服务器退出
+	为向管理过程提供信息，服务器会返回一个退出代码，如下所示。括号中的短语表示systemd回应代码的行为，对于systemd被用来管理服务器的平台。
+	* 0=successful termination (no restart done)
+	* 1=unsuccessful termination (no restart done)
+	* 2=unsuccessful termination (restart done)
+
+## 5.2 MySQL数据目录
+
+MySQL服务器管理的信息存储在名为data的目录下。以下列表简述了通常能在data目录下找到的条目，并提供了交叉参考以获得更多信息：
+* 数据目录子目录。数据目录的每个子目录都是一个数据库目录，与服务器管理的数据库相对应。所有的MySQL安装都有几个标准数据库：
+	* `mysql`目录对应对应`mysql`系统模式，其中包含MySQL服务器运行时所需要的信息。该数据库包含数据字典表和系统表。见5.3节 mysql系统模式。
+	* `performance_schema`目录对应性能模式，该模式提供了用于在运行时检查服务器内部执行的信息。见第二十七章 MySQL性能模式。
+	* `sys`目录对应`sys`模式，该模式提供了一组对象，以帮助更容易的理解性能模式信息。见第二十八章 MySQL sys模式。
+	* `ndbinfo`目录对应`ndbinfo`数据库，该数据库存储的是特定于NDB集群的信息（当前仅用于构建包含NDB集群的安装）。见23.5.14节 ndbinfo：NDB集群信息数据库。
+	* 其他子目录对应用户或应用创建的数据库。
+>Note
+>
+>`INFORMATION_SCHEMA`是一个标准数据库，但其实现不使用相应的数据库目录。
+* 服务器写入的日志文件。见5.4节 MySQL服务器日志。
+* InnoDB表空间和日志文件。见第十五章 InnoDB存储引擎。
+* 默认/自动生成的SSL和RSA证书和密钥文件。见6.3.3节 创建SSL和RSA证书和密钥。
+* 服务器进程ID文件（当服务器运行时）。
+* mysqld-auto.cnf文件存储持久性全局系统变量设置。见13.7.6.1节 变量分配的设置语法。
+
+上面列表中的一些条目可以通过重新配置服务器而放到其他地方。另外，`--datadir`选项可以更改数据目录本身的位置。对于一个给定的MySQL安装，查看服务器配置以确定条目是否被移动。
+
+## 5.3 mysql系统模式（to be continued）
+
+## 5.4 MySQL服务器日志
+
+*5.4.1 选择常规查询日志和慢查询日志输出目的地*
+
+*5.4.2 错误日志*
+
+*5.4.3 常规查询日志*
+
+*5.4.4 二进制日志*
+
+*5.4.5 慢查询日志*
+
+*5.4.6 服务器日志维护*
+
+MySQL服务器有几种日志，可以帮你了解正在发生的活动。
+
+| Log Type               | Information Written to Log                                   |
+| ---------------------- | ------------------------------------------------------------ |
+| Error log              | Problems encountered starting, running, or stopping mysqld   |
+| General query log      | Established client connections and statements received from clients |
+| Binary log             | Statements that change data (also used for replication)      |
+| Relay log              | Data changes received from a replication source server       |
+| Slow query log         | Queries that took more than long_query_time seconds to execute |
+| DDL log (metadata log) | Metadata operations performed by DDL statements              |
+
+默认情况下，除了Windows上的错误日志，没有日志是启用的。（DDL日志总是在被需要的时候被创建，而且没有用户可配置的选项，见[DDL日志](https://dev.mysql.com/doc/refman/5.7/en/ddl-log.html)。）下面的特定于日志的章节提供了关于服务器启用日志的信息。
+
+默认情况下，服务器会为数据目录中所有已启用的日志写入文件。你可以通过刷新日志强制服务器关闭并重新打开日志文件（或在某些情况下切换到新的日志文件）。当你发出一条`FLUSH LOGS`语句时，日志刷新就会发生；使用`flush-logs`或`refresh`参数执行mysqladmin；使用`--flush-logs`或`--master-data`选项执行mysqldump。见13.7.8.3节 `FLUSH`语句，4.5.2节 mysqladmin—一个MySQL服务器管理程序，4.5.4节 mysqldump—一个数据库备份程序。另外，当二进制日志的大小达到了`max_binlog_size`系统变量时，就会刷新。
+
+你可以在运行时控制常规查询日志和慢查询日志。你可以开启或禁用日志，或改变日志文件名。你可以告诉服务器将常规查询日志和慢查询日志写入日志表、日志文件或两者都写入。详细信息见5.4.1节 选择常规查询日志和慢查询日志输出目的地，5.4.3节 常规查询日志，5，4，5节 慢查询日志。
+
+中继日志只用在复制中，用来保存复制原服务器上的数据变更，也必须在从服务器上进行变更。中继日志内容和配置的讨论，见17.2.4.1节 中继日志。
+
+关于日志维护操作（比如旧日志到期）的信息，见5.4.6节 服务器日志维护。
+
+关于保证日志安全性的信息，见6.1.2.3节 密码和日志。
+
+### 5.4.1 选择常规查询日志和慢查询日志输出目的地（to be continued）
+
+*5.4.1.1 服务器启动时的日志控制*
+
+*5.4.1.2 服务器运行时的日志控制*
+
+*5.4.1.3 日志表的好处和特点*
+
+如果日志启用了，MySQL服务器可以灵活地控制写入常规查询日志和慢查询日志的输出目的地。日志可能的目的地是日志文件，或`mysql`系统数据库中的`general_log`和`slow_log`表。文件输出、表输出或两者都可以被选择。
+
+#### 5.4.1.1 服务器启动时的日志控制
+
+`log_output`系统变量指定了日志输出的位置。设置此变量不会启用日志，必须单独启用他们。
+* 如果在服务器启动时没有指定`log_output`，则默认的日志位置是`FILE`。
+* 如果在服务器启动时指定了`log_output`，其值为一个或多个逗号隔开的单词列表，这些单词选自`TABLE`（记录到表中）、`FILE`（记录到文件中）、`NONE`（既不记录到表中也不记录到文件中），如果`NONE`存在，则优先级最高。
+
+### 5.4.2 错误日志
+
+*5.4.2.1 错误日志配置*
+
+*5.4.2.2 错误日志默认位置配置*
+
+*5.4.2.3 错误事件字段*
+
+*5.4.2.4 错误日志过滤类型*
+
+*5.4.2.5 基于优先级的错误日志过滤（log_filter_internal）*
+
+*5.4.2.6 基于规则的错误日志过滤（log_filter_dragnet）*
+
+*5.4.2.7 以JSON格式记录错误*
+
+*5.4.2.8 记录到系统日志的错误*
+
+*5.4.2.9 错误日志输出格式*
+
+*5.4.2.10 错误日志文件刷新和重命名*
+
+本节讨论如何设置MySQL服务器以将诊断信息记录到错误日志中。有关选择错误消息字符集和语言的信息，见10.6节 错误消息字符集和10.12节 设置错误消息语言。
+
+错误日志包含mysqld启动和关闭时间的记录。还包含在服务器启动和关闭期间，以及运行期间发生的错误、警告和注意等诊断消息。比如，mysqld注意到需要自动检查或修复一个表，它将向错误日志中写入一条消息。
+
+根据错误日志的配置，错误消息也可以填充在性能模式的`error_log`表中，以提供日志的SQL接口并允许查询其内容。见27.12.21.1节 `error_log`表。
+
+在有些操作系统上，如果mysqld意外退出，错误日志包含一个堆栈追踪。该追踪可用于确定mysql的退出位置。见5.9节 调试MySQL。
+
+如果用于启动mysqld，mysqld_safe可能会向错误日志写入消息。比如，当mysqld_safe发现mysqld意外退出，它将重启mysqld，并将一条`mysqld restarted`消息写入错误日志。
+
+下面的章节讨论配置错误日志的各个方面。
+
+#### 5.4.2.1 错误日志配置
+
+MySQL8.0中，错误日志使用了5.5节 MySQL组件中描述的MySQL组件架构。错误日志子系统由执行日志事件过滤和写入的组件，以及配置要启用哪些组件以实现所需的日志记录结果的系统变量组成。
+
+本节描述如何为错误日志选择组件。关于日志过滤的教程，见5.4.2.4节 错误日志过滤类型。有关JSON和系统日志接收器的教程，见5.4.2.7节 以JSON格式记录错误，见5.4.2.8节 将错误记录到系统日志。有关所有可用的日志组件的细节，见5.5.3节 错误日志组件。
+
+基于组件的错误日志提供了如下特性：
+* 日志事件可以由过滤组件过滤，以影响可用于写入的信息。
+* 日志事件由接收器（写入器）组件输出。可以启用多个接收器组件，以将错误日志输出到多个位置。
+* 内建过滤器和接收器组件组合在一起以实现默认错误日志格式。
+* 可加载的接收器允许以JSON格式记录。
+* 可加载的接收器允许记录到系统日志。
+* 系统变量控制要启用的日志组件以及每个组件的运行方式。
+
+`log_error_services`系统变量控制启用哪个日志组件以用于错误日志。该变量可以包含0个、一个或多个元素的列表。在此情况下，元素可由分号界定（从MySQL8.0.12开始）或逗号界定，后面可选择跟空格。一个给定的设置不能即用分号又用逗号。组件的顺序很重要，因为服务器就是按照该顺序执行组件。
+
+默认情况，`log_error_services`的值如下：
+```sql
+mysql> SELECT @@GLOBAL.log_error_services;
++----------------------------------------+
+| @@GLOBAL.log_error_services            |
++----------------------------------------+
+| log_filter_internal; log_sink_internal |
++----------------------------------------+
+```
+该值表示日志时间首先通过`log_filter_internal`过滤器组件，然后通过`log_sink_internal`接收器组件，两者都是内建的。~~过滤器通过`log_error_services`后面指定名字的组件来改变日志事件产生。~~接收器就是日志事件的目的地。通常，接收器将日志事件处理为具有特定格式的日志消息，并将该消息写入相应的输出，比如写入文件或系统日志。
+>Note
+>
+>`log_error_services`值中最后一个组件不能是过滤器，这是一个错误，因为它对事件的任何修改都不会影响输出：
+>```sql
+>mysql> SET GLOBAL log_error_services = 'log_filter_internal';
+>ERROR 1231 (42000): Variable 'log_error_services' can't be set to the value
+>of 'log_filter_internal'
+>```
+>为改正该问题，在该值最后加一个接收器：
+>```sql
+>mysql> SET GLOBAL log_error_services = 'log_filter_internal; log_sink_internal';
+>Query OK, 0 rows affected (0.00 sec)
+>```
+
+`log_filter_internal`和`log_sink_internal`的组合实现了错误日志的默认过滤和输出行为。这些组件的行为受到其他几个服务器选项和系统变量的影响：
+* 输出目的地是由`--log-error`选项决定的（在Windows上，是`--pid-file`和·`--console`）。他们确定是将错误消息写入控制台还是文件，如果写入文件，那确定错误日志文件名。见5.4.2.2节 默认错误日志目的地配置。
+* `log_error_verbosity`和`log_error_suppression_list`系统变量会影响`log_filter_internal`允许的或禁止的日志事件的类型。见5.4.2.5节 基于优先级的错误日志过滤（log_filter_internal）。
+
+要修改用于错误记录的日志组件集，请根据需要加载组件，然后做特定于组件的配置，然后修改`log_error_services`的值。添加或移除组件受以下约束限制：
+* 要将日志组件加入到已启用组件列表中，请执行以下操作：
+	* 使用`INSTALL COMPONENT`语句加载组件（除非它是内建的或已经加载）。
+	* 如果组件公开了一些为了使组件成功初始化而必须设置的系统变量，请为这些系统变量分配合适的值。
+	* 通过将其列在`log_error_services`的值中，来启用组件。
+* 若组件想要被`log_error_services`的值所许可，则该插件要么是内建的，要么是可加载的并且已经使用`INSTALL COMPONENT`进行了加载。在服务器启动时尝试指定一个未知的组件，会导致`log_error_services`的值被设置为默认值。在服务器运行时尝试指定一个未知的组件，会产生错误并且`log_error_services`的值保持不变。
+* 要禁用一个日志组件，将其从`log_error_services`值中移除。然后，如果该插件是可加载的插件而且你想卸载它，使用`UNINSTALL COMPONENT`。
+当你使用`UNINSTALL COMPONENT`卸载一个可加载插件时，若该插件还位于`log_error_services`值中，则会产生一个错误。
+
+比如，要使用系统日志接收器（`log_sink_sysenevtlog`)，而不用默认的接收器（`log_sink_internal`），首先要加载该接收器组件，然后修改`log_error_service`的值：
+```sql
+INSTALL COMPONENT 'file://component_log_sink_syseventlog';
+SET GLOBAL log_error_services = 'log_filter_internal; log_sink_syseventlog';
+```
+>Note
+>
+>用于使用`INSTALL COMPONENT`加载组件的URN就是该组件的名字再加上前缀`file://component_`。比如，对于`log_sink_syseventlog`组件，相应的URN就是`file://component_log_sink_syseventlog`。
+
+可以配置多个日志接收器，从而可以将输出发送到多个目的地。要启用除了默认接收器以外的系统日志接收器，像下面这样设置`log_error_services`的值：
+```sql
+SET GLOBAL log_error_services = 'log_filter_internal; log_sink_internal; log_sink_syseventlog';
+```
+要恢复为仅使用默认的接收器并卸载系统日志接收器，执行以下语句：
+```sql
+SET GLOBAL log_error_services = 'log_filter_internal; log_sink_internal;
+UNINSTALL COMPONENT 'file://component_log_sink_syseventlog';
+```
+要配置每次服务器启动时都会启用的组件，使用以下过程：
+1. 如果组件可加载，使用`INSTALL COMPONENT`加载它。加载组件会将其注册到`mysql.component`系统表中，所以随后的服务器启动都会自动加载它。
+2. 在服务器启动时设置`log_error_services`的值使其包含该组件名。设置其值时，使用服务器的配置文件，或者使用`SET PERSIST`语句，即可以为运行中的MySQL实例设置该值，也可以将该值保存起来以供后续重新启动的服务器使用。见13.7.6.1节 用于变量值分配的SET语句句法。在配置文件中设置的值会影响服务器下一次的重启，使用`SET PERSISIT`设置的值会立刻产生影响，也会影响后续的重启。
+
+假如你想配置，对于每一次服务器启动，除了内建的日志过滤器和接收器外，还要使用JSON日志接收器（`log_sink_json`），首先加载JSON接收器（如果未加载）：
+```sql
+INSTALL COMPONENT 'file://component_log_sink_json';
+```
+然后设置`log_error_services`的值，使其在服务器重启时生效，你可以在配置文件中进行设置：
+```sql
+[mysqld]
+log_error_services='log_filter_internal; log_sink_internal; log_sink_json'
+```
+或者你可以使用`SET_PERSIST`进行设置：
+```sql
+SET PERSIST log_error_services = 'log_filter_internal; log_sink_internal; log_sink_json';
+```
+`log_error_services`变量指定组件的顺序很重要，特别是过滤器和接收器的相对位置。考虑这个`log_error_services`值：
+```
+log_filter_internal; log_sink_1; log_sink_2
+```
+上面例子中，日志时间通过内建的过滤器，然后到达第一个接收器，然后到达第二个接收器。两个接收器都可以接收到过滤的日志事件。
+再看这个：
+```
+log_sink_1; log_filter_internal; log_sink_2
+```
+上面的例子中，日志时间通过第一个接收器，然后通过内建的过滤器，然后到达第二个接收器。第一个接收器收到的是未过滤的时间。第二个接收器收到的是过滤的时间。如果你想让一个日志包含所有的未过滤的日志事件，另一个日志只包含经过过滤的日志事件的子集，你可以用这种方法配置错误日志。
+>Note
+>
+>如果启用的日志组件包括提供性能模式支持的接收器，写入错误日志的事件也可以写入性能模式的`error_log`表。这样可以使用SQL查询查阅错误日志内容。当前，传统格式`log_sink_internal`和JSON格式`log_sink_json`接收器支持此功能。见27.12.21.1节 error_log表。
+
+#### 5.4.2.2 默认错误日志目的地配置
+
+本节介绍哪个服务器选项配置默认的错误日志目的地，该目标可以是控制台或指定名字的文件。还提示哪些日志接收器组件的默认目的地是基于其自身输出目的地的。
+
+本讨论中，“console”意思是`stdeer`，标准错误输出，这就是你的终端或控制台窗口，除非你将标准错误输出重定向到了一个不同的目的地。
+
+服务器解释了用于确定默认错误日志目的地的选项，在Windows和Unix系统上有些地方是不同的。要确保使用适合你平台的信息来配置目的地。在服务器解释了默认错误日志目的地选项后，它通过设置`log_error`系统变量来指示默认的目的地，者会影响多个日志接收器组件在何处写入错误消息。以下各节讨论该主题。
+
+*5.4.2.2.1 Windows默认错误日志目的地*
+
+*5.4.2.2.2 Unix和类Unix系统默认错误日志目的地*
+
+*5.4.2.2.3 默认错误日志目的地如何影响日志接收器*
+
+##### 5.4.2.2.1 Windows默认错误日志目的地（to be continued）
+
+##### 5.4.2.2.2 Unix和类Unix系统默认错误日志目的地
+
+在Unix和类Unix系统上，mysqld使用`--log-error`选项来决定默认错误日志目的地是控制台还是文件，如果是文件，则文件名为：
+* 如果`--log-error`没有给出，，默认目的地就是就是控制台。
+* 如果`--log-error`给出一个未命名的文件，则默认目的地是在`data`目录下一个名为`host_name.err`的文件。
+* 如果`--log-error`给出了一个有名字的文件，则默认目的地就是该文件（如果该文件没有后缀，则会加上一个`.err`后缀）。该文件就位于`data`目录下面，除非给出了一个绝对地址指定了一个不同的位置。
+* 如果`--lor-error`是在一个选项文件的[mysqld]、[server]或[mysqld_safe]组中给出，在该系统上使用mysqld_safe启动服务器，mysqld_safe会找到并使用该选项，并将其传给mysqld。
+>Note
+>
+>对于Yum或APT软件包安装，通常在服务器配置文件中使用类似`log-error=/var/log/mysqld.log`的选项来配置一个位于`/var.log`下面的错误日志文件。将路径名从选项中移除，会导致使用`data`目录下的`host_name.err`文件。
+
+如果默认错误日志目的地是控制台，则服务器将`log-error`系统变量设置为`stderr`。否则，默认目的地将是一个文件，服务器将`log-error`设置为该文件名。
+
+##### 5.4.2.2.3 默认错误日志目的地如何影响日志接收器（翻译不准确）
+
+服务器解析错误日志目的地配置选项发后，将设置`log-error`系统变量来指示默认错误日志目的地。日志接收器组件本身的输出目的地可以基于该`log-error`值，也可以独立于`log-error`的值来确定其目的地。
+
+如果`log-error`的值为`stderr`，则默认错误日志目的地为控制台，而且日志接收器基于默认目的地的输出目的地也会写入控制台：
+* `log_sink_internal, log_sink_json, log_sink_test`：这些接收器写入控制台。即使对于`log_sink_json`这类可以多次启用的接收器，也是如此，所有实例都写入控制台。
+* `log_sink_syseventtlo`：该接收器会忽略`log_error`的值，写入系统日志。
+
+如果`log_error`的值不是`stderr`，则默认的错误日志目的地是一个文件，`log_error`的值指示该文件的名字。日志接收器会将其输出目的地基于该默认目的地，将输出文件名基于该文件名。（接收器可能恰好使用该名称，也可能使用了它的某些变体。）假如`log_error`的值为`file_name`，则日志接收器使用下面的名字：
+* `log_sink_internal, log_sink_test`：这些接收器写入`file_name`。
+* `log_sink_json`：在`log_error_services`中指定的这个接收器的连续的实例会写入名为`file_name`+数字.NN.json后缀：`file_name.00.json, file_name.01.json`以此类推。
+* `log_sink_systemlog`：该接收器写入系统日志，忽略`log_error_`的值。
+
+#### 5.4.2.3 错误事件字段
+
+用于错误日志的错误事件包含一组字段，每个字段由一个 键/值 对组成。一个事件字段可以分类为核心、可选或用户自定义：
+* 将为错误事件自动设置一个核心字段。但是，不能保证其在事件处理期间在事件中的存在，因为像任何类型的字段一样，核心字段可能会被日志过滤器取消设置。如果发生这种情况，则无法通过该筛选器中的后续处理以及该过滤器之后执行的组件（例如日志接收器）来找到该字段。
+* 可选字段通常是缺席的，但对于特定的事件类型，也可能会存在。当存在时，可选字段提供合适的和可用的额外事件信息。
+* 用户自定义字段是名称尚未被定义为核心字段或可选字段的任何字段。用户自定义字段由日志过滤器创建后存在。
+
+如前面的描述所暗示，一个给定字段可能会在事件处理中缺席，可能因为它本来就不存在，或者被过滤器丢弃了。对于日志接收器，缺少字段的影响是特定于接收器的。例如，接收器可能会从日志消息中忽略该字段，指示该字段丢失，或替换为默认值。如有疑问，请测试：使用一个可取消该字段的过滤器，然后检查日志接收器对该字段做了什么。
+
+下面的部分介绍核心和可选错误事件字段。对于单独的日志过滤器组件，这些字段可能还会有特定于过滤器的注意事项，或者过滤器可能会添加没有列出来的用户自定义字段。
+
+*5.4.2.3.1 核心错误事件过滤器*
+
+*5.4.2.3.2 可选错误事件过滤器*
+
+##### 5.4.2.3.1 核心错误事件字段
+
+以下错误事件字段为核心字段：
+* time
+事件时间戳，精确到微妙
+* msg
+事件信息字符串
+* prio
+事件优先级，用于指示系统，错误、警告或注意/信息事件。该字段相当于`syslog`的severity。下表显示了可能的优先级。  
+| Event Type             | Numeric Priority |
+|------------------------|------------------|
+| System event           | 0                |
+| Error event            | 1                |
+| Warning event          | 2                |
+| Note/information event | 3                |
+
+该prio值是一个数字。与此相关的是，错误事件还可以包括一个可选 `label`字段，将优先级表示为字符串。例如，prio值为2的事件，可能的label值为 'Warning'。  
+过滤器组件可以根据优先级包含或移除错误事件，除了系统事件，系统时间是强制的，不能被移除。  
+通常，消息优先级确定如下：  
+情况或事件是否可行？
+	1. 可行：情况或事件是否可以忽略？
+		1. 可以忽略：优先级是警告。
+		2. 不可以忽略：优先级是错误。
+	2. 不可行：情况或事件是否是强制的？
+		1. 是强制的：优先级是系统。
+		2. 不是强制的：优先级是注意/信息。
+* err_code
+事件错误代码，是一个数字，比如1022。
+* err_symbol
+事件错误标签，是一个字符串，比如`ER_DUP_KEY`。
+* SQL_state
+事件SQLSTATE的值，是一个字符串，比如23000.
+* subsystem
+发生事件的子系统。可能的值是InnoDB（InnoDB存储引擎），Repl（复制子系统），Server（其他）。
+
+##### 5.4.2.3.2 可选错误事件字段
+
+可选错误事件字段分为以下几类：
+* 关于错误的额外信息，比如操作系统发出的错误，或者错误标签：
+	* OS_errno
+	操作系统错误数字
+	* OS_errmsg
+	操作系统错误消息
+	* label
+	该标签对应于prio值，是一个字符串
+* 标识事件发生的客户端：
+	* user
+	客户端用户名
+	* host
+	客户端主机
+	* thread
+	mysqld负责产生错误事件的线程ID。该ID指示服务器的哪个部分产生了该事件，与常规查询日志和慢查询日志消息（包括连接线程ID）一致。
+	* query_id
+	查询ID
+* 调试信息：
+	* source_file
+	事件发生的源文件，没有任何前导路径。
+	* function
+	事件发生的函数
+	* component
+	事件发生的组件或插件。
+
+#### 5.4.2.4 错误日志过滤器类型
+
+错误日志配置通常包含一个日志过滤器组件和一个或多个日志接收器组件。对于错误日志过滤器，MySQL提供了以下组件选择：
+* `log_filter_internal`：该过滤器组件根据日志事件优先级和错误代码与`log_error_verbosity`和`log_error_suppression_list`系统变量相结合来提供错误日志过滤。`log_filter_internal`是内建的，默认启用。见5.4.2.5节 基于优先级的错误日志过滤（log_filter_internal）。
+* `log_filter_dragnet`：该过滤器组件根据用户提供的规则与`dragnet.log_error_filter_rules`系统变量相结合提供错误日志过滤。见5.4.2.6节 基于规则的错误日志过滤（log_filter_dragnet）。
+
+#### 5.4.2.5 基于优先级的错误日志过滤（log_filter_internal）
+
+`log_filter_internal`日志过滤器组件实现了一种基于错误事件优先级和错误代码的简单的日志过滤格式。要影响`log_filter_internal`允许的或禁止旨在用于错误日志的错误、警告和信息事件，请设置`log_error_verbosity`和`log_error_suppression_list`系统变量。
+
+`log_error_internal`是内建的，默认启用。如果该过滤器被禁用了，则`log_error_verbosity`和`log_error_suppression_list`会失效，所以必须使用其他过滤器服务来代替执行过滤，在需要的地方进行过滤（比如，使用`log_filter_dragnet`过滤器组件时，使用单独的过滤规则）。关于过滤器配置的信息，见5.4.2.1节 错误日志配置
+
+*5.4.2.5.1 赘言（复杂度）过滤* ~~是指错误日志写入错误、警告、信息中的一个或多个~~
+
+*5.4.2.5.2 禁用列表过滤* ~~在该列表中禁用不想写入错误日志的错误代码
+
+*5.4.2.5.3赘言过滤和禁用列表过滤交互使用*
+
+##### 5.4.2.5.1 赘言过滤
+
+用于写入错误日志的事件有`ERROR, WARNING, INFORMATION`三种优先级。`log_error_verbosity`系统变量根据允许哪种优先级消息写入日志来控制赘言，该变量的值如下所示：
+| log_error_verbosity Value | Permitted Message Priorities |
+|---------------------------|------------------------------|
+| 1                         | ERROR                        |
+| 2                         | ERROR, WARNING               |
+| 3                         | ERROR, WARNING, INFORMATION  |
+如果`log_error_verbosity`的值为2或更大，对于基于语句的日志，关于语句的服务器日志消息就不安全。如果其值为3，服务器会记录中止的连接和新连接尝试访问拒绝错误。见附录B.3.2.9节 通信错误和中止的连接
+
+如果你在使用复制，则`log_error_verbosity`的值推荐是2或更高，为获得更多正在发生的信息，比如网络故障和重新连接的信息。
+
+如果一个复制从服务器上的`log_error_verbosity`值为2或更高，从服务器会打印消息至错误日志，以提供有关其状态的信息，比如，当切换到另一个中继日志或重新连接后，它开始工作的二进制和中继日志的坐标，等等此类信息。
+
+还有一个`system`消息优先级，该优先级不收赘言过滤影响。有关没有错误的情况的系统消息会写入错误日志，忽略`log_error_verbosity`的值，不受其影响。这些系统消息包括服务器启动和关闭消息，以及一些设置的重大改变。
+
+MySQL错误日志中，系统消息被标记为“System”，其他日志接收器可能会遵循也可能不会遵循相同的惯例，而且在生成的日志中，系统消息可能会分配用于信息优先等级的标签，比如“Note”或“Information”。如果你基于消息的标签对日志记录应用任何其他过滤或重定向，系统消息将不会覆盖您的过滤器，但将以与其他消息相同的方式对其进行处理。
+
+##### 5.4.2.5.2 禁用列表过滤
+
+`log_error_suppression_list`系统变量适用于错误日志的事件，用于指定哪些优先级为`WARNING, INFORMATION`的事件不写入错误日志。比如，一种特殊的`WARNING`消息在错误日志中被认为是令人讨厌的“噪音”，因为它出现的太频繁而且没有用，可以禁用它。`log_error_suppression_list`不会禁用优先级为`ERROR, SYSTEM`的消息。
+
+`lot_error_suppression_list`的值可能是空字符串，或者是一个或多个逗号分割的值得列表，用于指示要禁用的消息的错误代码。错误代码可以以符号或数字形式指定。数字代码被指定时可以加上`MY-`前缀，也可以不加。数字部分的前导0并不重要。允许的代码格式示例：
+```
+ER_SERVER_SHUTDOWN_COMPLETE
+MY-000031
+000031
+MY-31
+31
+```
+出于可读性和可移植性，符号值比数字值更可取。
+
+尽管被禁用的代码可以用符号或数字格式表示，但每个错误代码的数字值必须在一个被允许的范围内：
+* 1到999：服务器和客户端使用的全局错误代码。
+* 10000或更高：用于写入错误日志的服务器错误代码（不发送给客户端）。
+
+另外，指定的错误代码必须由MySQL实际使用。尝试指定一个超出取值范围之外的代码或者是在取值范围之内但不被MySQL使用的代码，会产生一个错误，并且`log_error_suppression_list`的值保持不变。
+
+有关错误代码范围以及在每个范围内定义的错误符号和数字的信息，见 B.1节“错误消息的源和元素”  和 《 MySQL 8.0错误消息参考》。
+
+对于一个给定的错误代码，服务器可以生成不同优先级的消息，所以对于`log_error_suppression_list`中列出的错误代码关联的消息的禁用取决于其优先级。假设该变量值为'ER_PARSER_TRACE,MY-010001,10002'，则`log_error_suppression_list`变量对这些错误代码的消息有如下影响：
+* 若生成的消息的优先级为`WARNING, INFORMATION`，则该消息被禁用。
+* 若生成的消息的优先级为`ERROR, SYSTEM`，则该消息不被禁用。
+
+##### 5.4.2.5.3 赘言过滤和禁用列表过滤交互使用
+
+`log_error_verbosity`与`log_error_suppression_list`相结合的效果，考虑服务器以以下设置启动：
+```
+[mysqld]
+log_error_verbosity=2     # error and warning messages only
+log_error_suppression_list='ER_PARSER_TRACE,MY-010001,10002'
+```
+这种情况下，`log_error_verbosity`允许优先级为`ERROR, WARNING`的消息，并丢弃优先级为`INFORMATION`的消息。~~对于不丢弃的消息，`log_error_suppression_list`丢弃优先级为`WARNING`的消息和指定错误代码的消息。（有问题）~~
+>Note
+>
+>例子中`log_error_verbosity`的值为2，是其默认值，所以对于优先级为`INFORMATION`的消息指示默认描述了，没有显示设置。如果你想让`log_error_suppression_list`能够影响优先级为`INFORMATION`的消息，你必须将`log_error_verbosity`设置为3。
+
+考虑服务器以以下设置启动：
+```
+[mysqld]
+log_error_verbosity=1     # error messages only
+```
+该例子中，`log_error_verbosity`允许优先级为`ERROR`的消息，丢弃优先级为`WARNING, INFORMATION`的消息。此时设置`log_error_suppression_list`是不会有任何影响的，因为它要丢弃的所有错误代码已经被`log_error_verbosity`丢弃了。（`log_error_suppression_list`变量只会作用于优先级为`WARNING, INFORMATION`的消息。）
+
+#### 基于优先级的错误日志过滤（log_filter_internal）
+
+`log_filter_internal`日志过滤器组件实现了
